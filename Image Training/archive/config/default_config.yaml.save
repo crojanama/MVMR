@@ -1,0 +1,47 @@
+data:
+  bucket_name: "mvmr-scrapright-images-ojanama"
+  region_name: null
+  train_prefix: "train"
+  val_prefix: "val"
+  test_prefix: "test"
+  cache_images: true
+  cache_dir: ".cache/s3_images"
+  s3_read_retries: 8
+  s3_retry_backoff_seconds: 0.3
+
+preprocessing:
+  image_size: 224
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+  rotation_degrees: 12
+  horizontal_flip_prob: 0.5
+
+model:
+  name: "resnet18"          # baseline_cnn | resnet18 | resnet50
+  pretrained: true
+  freeze_backbone: false
+
+training:
+  seed: 42
+  device: "auto"            # auto | cpu | cuda
+  epochs: 10
+  batch_size: 32
+  num_workers: 2
+  optimizer:
+    name: "adam"            # adam | sgd
+    lr: 0.0003
+    weight_decay: 0.0001
+    momentum: 0.9
+  scheduler:
+    enabled: false
+    name: "step"
+    step_size: 4
+    gamma: 0.5
+  tensorboard:
+    enabled: true
+    log_dir: "artifacts/tensorboard"
+
+output:
+  checkpoint_dir: "artifacts/checkpoints"
+  metrics_dir: "artifacts/metrics"
+ 

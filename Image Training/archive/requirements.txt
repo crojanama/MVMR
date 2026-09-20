@@ -1,0 +1,8 @@
+boto3
+numpy
+Pillow
+PyYAML
+scikit-learn
+tensorboard
+torch
+torchvision

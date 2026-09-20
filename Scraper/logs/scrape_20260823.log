@@ -1,0 +1,28 @@
+Starting weekly scrape at 2026-08-23T04:02:05+00:00...
+Resolved date range: 08/16/2026 -> 08/22/2026
+Valid ticket prefixes: ['MV']
+Logging into ScrapRight...
+Login submitted.
+Waiting for login to complete in the browser...
+
+Playwright timeout: Locator.wait_for: Timeout 60000ms exceeded.
+Call log:
+  - waiting for locator("a.nav-link[href=\"/home\"]") to be visible
+
+Scraper finished with exit code 1. Stopping instance...
+Stopping i-0cea2f3cf1a36acbb in us-east-2...
+{
+    "StoppingInstances": [
+        {
+            "InstanceId": "i-0cea2f3cf1a36acbb",
+            "CurrentState": {
+                "Code": 64,
+                "Name": "stopping"
+            },
+            "PreviousState": {
+                "Code": 16,
+                "Name": "running"
+            }
+        }
+    ]
+}

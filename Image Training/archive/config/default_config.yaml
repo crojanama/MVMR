@@ -1,0 +1,72 @@
+data:
+  bucket_name: "mvmr-scrapright-images-ojanama"
+  region_name: null
+  train_prefix: "train"
+  val_prefix: "val"
+  test_prefix: "test"
+  cache_images: true
+  # Local NVMe instance store (ephemeral, ~116GB, reproducible from S3). On this
+  # DLAMI the instance store is auto-mounted at /opt/dlami/nvme. IMPORTANT: create
+  # this subdir with write permission first (see README) — if the path isn't on
+  # the mounted volume, the cache silently lands on the near-full EBS root.
+  # To revert to EBS, set this back to ".cache/s3_images".
+  cache_dir: "/opt/dlami/nvme/s3_images"
+  s3_read_retries: 8
+  s3_retry_backoff_seconds: 0.3
+
+preprocessing:
+  image_size: 224
+  resize_size: 256          # eval: resize shorter side to this, then center-crop image_size
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+  rotation_degrees: 12      # only used when trivial_augment is false
+  horizontal_flip_prob: 0.5
+  # --- Augmentation strength (accuracy vs. CPU/dataloader cost). ---
+  random_resized_crop: true # scale/aspect crop instead of fixed squash-resize
+  trivial_augment: true     # TrivialAugmentWide: strong, parameter-free policy
+  color_jitter: 0.0         # >0 enables brightness/contrast/saturation jitter
+  random_erasing_prob: 0.1  # random occlusion regularization
+  rrc_scale: [0.65, 1.0]    # area range for RandomResizedCrop
+
+model:
+  name: "resnet50"          # baseline_cnn | resnet18 | resnet50
+  pretrained: true
+  freeze_backbone: false
+
+training:
+  seed: 42
+  device: "auto"            # auto | cpu | cuda
+  epochs: 40
+  batch_size: 32
+  # --- Accuracy recipe ---
+  label_smoothing: 0.1      # softens targets; small accuracy + calibration gain
+  class_weighted_loss: false
+  early_stopping_patience: 8
+  num_workers: 3            # 4 vCPUs available; 3 leaves one for the main/GPU-feed thread. Cap via S3_DATA_MAX_WORKERS.
+  # --- Performance (T4 / g4dn.xlarge tuned). All optional; set false to restore
+  # the original fp32, deterministic behavior. ---
+  mixed_precision: true       # AMP autocast + GradScaler on CUDA (uses T4 Tensor Cores)
+  channels_last: true         # NHWC memory format; faster convs on GPU, numerically equivalent
+  cudnn_benchmark: true       # autotune cuDNN kernels for the fixed 224x224 input (disables strict determinism)
+  persistent_workers: true    # keep DataLoader workers (and their S3 clients) alive across epochs
+  prefetch_factor: 4          # batches each worker prefetches ahead of the GPU
+  compile: false              # experimental: torch.compile (gains on T4/Turing are uncertain)
+  optimizer:
+    name: "adam"            # adam | sgd
+    lr: 0.0003
+    weight_decay: 0.0001
+    momentum: 0.9
+  scheduler:
+    enabled: true
+    name: "cosine"          # cosine | step
+    t_max: null             # cosine: defaults to epochs when null
+    step_size: 4            # step only
+    gamma: 0.5              # step only
+  tensorboard:
+    enabled: true
+    log_dir: "artifacts/tensorboard"
+
+output:
+  checkpoint_dir: "artifacts/checkpoints"
+  metrics_dir: "artifacts/metrics"
+  log_file: "artifacts/logs/train.log"
