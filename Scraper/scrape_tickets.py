@@ -235,14 +235,64 @@ def login(page):
     print("Login submitted.")
 
 
+DEBUG_S3_PREFIX = "_debug"
+
+
+def save_debug_snapshot(page, label: str):
+    """
+    Best-effort record of what the browser is showing right now.
+
+    Prints the URL, title and visible text into the run log, saves a screenshot
+    to MVMR/logs, and copies the screenshot to s3://<bucket>/_debug/ so it can
+    be viewed without starting the instance. Never raises: a failed capture
+    must not hide the original error.
+    """
+    stamp = datetime.now(TIMEZONE).strftime("%Y%m%d_%H%M%S")
+
+    try:
+        print(f"[debug] URL:   {page.url}")
+        print(f"[debug] Title: {page.title()}")
+        visible_text = page.locator("body").inner_text(timeout=5000)
+        print("[debug] Visible text (first 1500 chars):")
+        print(visible_text[:1500])
+    except Exception as e:
+        print(f"[debug] Could not read page state: {e}")
+
+    try:
+        logs_dir = MAIN_DIR / "logs"
+        logs_dir.mkdir(exist_ok=True)
+        screenshot_path = logs_dir / f"{label}_{stamp}.png"
+        page.screenshot(path=str(screenshot_path), full_page=True, timeout=15000)
+        print(f"[debug] Screenshot saved to {screenshot_path}")
+    except Exception as e:
+        print(f"[debug] Could not save screenshot: {e}")
+        return
+
+    try:
+        s3_key = f"{DEBUG_S3_PREFIX}/{screenshot_path.name}"
+        s3.put_object(
+            Bucket=S3_BUCKET_NAME,
+            Key=s3_key,
+            Body=screenshot_path.read_bytes(),
+            ContentType="image/png",
+        )
+        print(f"[debug] Screenshot copied to s3://{S3_BUCKET_NAME}/{s3_key}")
+    except Exception as e:
+        print(f"[debug] Could not copy screenshot to S3: {e}")
+
+
 def wait_for_login_to_complete(page):
     print("Waiting for login to complete in the browser...")
 
     dashboard_link = page.locator('a.nav-link[href="/home"]')
     transactions_link = page.locator('a.nav-link[href="/transaction/ticket"]')
 
-    dashboard_link.wait_for()
-    transactions_link.wait_for()
+    try:
+        dashboard_link.wait_for()
+        transactions_link.wait_for()
+    except PlaywrightTimeoutError:
+        save_debug_snapshot(page, "login_fail")
+        raise
 
     print("Login detected. Continuing automatically...")
 
